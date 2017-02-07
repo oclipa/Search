@@ -1,0 +1,335 @@
+#!/usr/bin/perl
+
+use File::Find;
+use File::Copy;
+
+############################
+
+sub getdir
+{
+  print "\n";
+  print "Which directory do you wish to make the base of your search?\n";
+  print "If you wish to search for a script just hit <RETURN>\n";
+  print "(Enter q to exit)\n";
+  chomp($searchdir = <STDIN>);
+
+  if (! $searchdir )
+  {
+     $searchdir = `pwd`;
+     chomp($searchdir);
+  } 
+  elsif ( $searchdir eq "q" ) 
+  {
+     exit(0);
+  }
+}
+
+############################
+
+sub getsearch
+{
+  &getdir;
+
+  print "You are searching:\n";
+  print "$searchdir\n";
+  print "(and its sub-directories)\n";
+  print "\n";
+
+  print "Which of the below do you wish to do?:\n";
+  print "\n";
+  print "Select an option:\n";
+
+  print "1. Search for a File(s)\n";
+  print "2. Search for Text within a file\n";
+  print "3. Search for Files last edited on a particular date\n";
+  print "4. Search for a Script\n";
+  print "5. QUIT\n";
+
+  chomp($option = <STDIN>);
+
+  if ( $option == 1 ) { print "\nSearch for a File\n"; &findfile; &doagain; }
+  elsif ( $option == 2  ) { print "\nSearch for Text within a File\n"; &findtxt; &doagain; }
+  elsif ( $option == 3   ) { print "\nSearch for Files last edited on a particular date\n"; &finddate; &doagain; }
+  elsif ( $option == 4  ) { print "\nSearch for a Script\n"; &findscript; &doagain; }
+  elsif ( $option == 5  ) { print "\nGoodbye\n"; exit(0); }
+}
+
+sub doagain
+{
+  print "\n";
+  print "Current Search finished!\n";
+  print "\n";
+  print "Do you wish to do another search? (y/n): ";
+
+  chomp($doagain = <STDIN>);
+
+  if ( $doagain eq "n" ) { print "Goodbye\n"; exit(0); } else { &getsearch; }
+}
+
+############################
+
+sub searchme
+{
+  $found = "$_";
+  $dir = "$File::Find::dir";
+
+  if ( -f $found )
+  {
+    $i++;
+    if ( $i == $j ) { syswrite(STDOUT,"#",1); }
+    $k = $j+1;
+    if ( $i >= $k ) { $i=0; }
+
+
+    if ( $option == 2 && -r $found )
+    {
+      $target = "$dir/$found";
+
+      if ( -T $target )
+      {
+        open(INP,"<$target") || warn "Cannot open $target: $!";
+
+        while ($line = <INP>)
+        {
+          chomp($line);
+
+          if ( $line =~ /$pattern/i )
+          {
+          $output = $dir.'/'.$found;
+          print OUT "$output : $line\n";
+          }
+        }
+
+        close(INP);
+      }
+    }
+
+    if ( $option == 1 && $found =~ /$pattern/i )
+    {
+      $output = "$dir/$found\n";
+      print OUT "$output";
+    }
+
+  }
+
+  $_ = "$found";
+}
+
+############################
+
+sub findfile
+{
+  $j = 1000;
+
+  print "\n";
+  print " This will search the current directory\n";
+  print "       and all sub-directories.\n";
+  print "\n";
+  print "Enter the pattern you wish to search for\n";
+  print "  You do not need wildcards (e.g. *)\n";
+  print "         Press Ctrl-C to exit\n";
+  print "\n";
+
+  chomp($pattern = <STDIN>);
+
+  print "\nSearching... (# = $j files searched)\n";
+
+  open(OUT,">>$database") || die "Cannot open $database: $!";
+
+  &addheader;
+
+  $i=0;
+  find \&searchme,"$searchdir";
+
+  close(OUT);
+
+  print "\nFinished!\n";
+
+  &viewresult;
+}
+
+############################
+
+sub findtxt
+{
+  $j = 100;
+
+  print "\n";
+  print " This will search the current directory\n";
+  print "       and all sub-directories.\n";
+  print "\n";
+  print "Enter the pattern you wish to search for\n";
+  print "   You do not need wildcards (e.g. *)\n";
+  print "         Press Ctrl-C to exit\n";
+  print "\n";
+
+  chomp($pattern = <STDIN>);
+
+  print "\nSearching... (# = $j files searched)\n";
+
+  open(OUT,">>$database") || die "Cannot open $database: $!";
+
+  &addheader;
+
+  $i=0;
+  find \&searchme,"$searchdir";
+
+  close(OUT);
+
+  print "\nFinished!\n";
+
+  &viewresult;
+}
+
+############################
+
+sub wheredate
+{
+  print "\nThis does not currently work!\n";
+  exit(0);
+#  cd $SEARCHDIR
+#  find . -ls 2>/dev/null | grep "$THISDATE" |while read LINE
+#  do
+#    DATE_MOD=`echo $LINE|cut -f8-9 -d" "`
+#    TIME=`echo $LINE|cut -f10 -d" "`
+#    VAL=VAL+1
+#    printf "\b\b\b\b%4b" $VAL
+#    LINE2=`echo $LINE|cut -f11 -d" "`
+#    FILE=`echo $LINE2|cut -f2-20 -d"./"`
+#    echo "$TIME"\\c >> $OPDIR/tempfile_for_file_search
+#    echo "  $SEARCHDIR$FILE" >> $OPDIR/tempfile_for_file_search
+#  done
+}
+
+############################
+
+sub findscript
+{
+  print "\n";
+  print " This will search the current path\n";
+  print "\n";
+  print "Enter the pattern you wish to search for\n";
+  print "   You do not need wildcards (e.g. *)\n";
+  print "         Press Ctrl-C to exit\n";
+  print "\n";
+  print "search for > ";
+
+  chomp($pattern = <STDIN>);
+
+  print "\n******************************\n\n";
+
+  $path = $ENV{'PATH'};
+
+  @bits = split(":",$path);
+
+  for($i=0;$i<$#bits;$i++)
+  {
+    $dir = $bits[$i];
+
+    if ( -d $dir )
+    {
+      opendir(DIR,$dir) || die "Cannot open $dir: $!";
+      @listing = readdir(DIR);
+      closedir(DIR);
+
+      foreach $file (@listing)
+      {
+        if ( $file =~ /$pattern/ )
+        {
+          print "$dir/$file\n";
+        }
+      }
+    }
+  }
+
+  print "\n******************************\n";
+
+}
+      
+############################
+
+sub finddate
+{
+  print "\nThis does not currently work!\n";
+  exit(0);
+#         print "Which date do you wish to search for?"
+#         print "(e.g. Apr 23 or Sep  1)"
+#         read THISDATE
+#
+#         print ">> These files were all last edited on $THISDATE..." > $OPDIR/tempfile_for_file_search
+#
+#         print
+#         print "**********************************************"
+#         print "This may take a while..."
+#         print "(Press CTRL-C to exit)"
+#         print "Each > indicates a file found."
+#         print "**********************************************"
+#         print
+#
+#         printf "Files Found: 0000"
+#         wheredate
+#
+#         printf "\nFinished!"
+#         print
+#         VAL=0
+#
+#         sort -d $OPDIR/tempfile_for_file_search > $OPDIR/finddate_results_file
+#
+#         rm $OPDIR/tempfile_for_file_search
+#         mv $OPDIR/finddate_results_file $OPDIR/tempfile_for_file_search
+#
+#         viewresult
+}
+
+############################
+
+sub viewresult
+{
+  if ( -f "/usr/bin/mousepad" )
+  {
+    exec "mousepad $database";
+  } elsif ( -f "/usr/bin/gedit" ) {
+    exec "gedit $database";
+  } elsif ( -f "/usr/bin/kwrite" ) {
+    exec "kwrite $database";
+  } else {
+    exec "more $database";
+  }
+
+#  print "Delete Results? (y/n):";
+#  chomp($ans = <STDIN>);
+#
+#  if ($ans=~/y/) { unlink($database); }
+}
+
+############################
+
+sub addheader
+{
+  print OUT "#######################################################\n";
+  print OUT "# If you want to save this file remember to RENAME it #\n";
+  print OUT "#        e.g. use Save As... from the File Menu       #\n";
+  print OUT "#######################################################\n";
+  print OUT "\nThe following files were found...\n";
+}
+
+###########################################################################
+
+
+$database = "/tmp/tempfile_for_file_search";
+
+if (-f $database) {
+  print "Overwrite $database? (y/n):";
+  chomp($ans = <STDIN>);
+  if ($ans=~/y/) {
+    unlink($database);
+  } else {
+    print "Exiting...\n";
+    exit(0);
+  }
+}
+
+&getsearch;
+
+
+
